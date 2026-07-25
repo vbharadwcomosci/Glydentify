@@ -80,7 +80,12 @@ class GTDonorPredictor(nn.Module):
         if self.model_type in HF_SEQUENCE_MODEL_TYPES:
             self.seq_encoder = EsmModel.from_pretrained(checkpoint_name)
             if self.model_type in SEQDANCE_MODEL_TYPES:
-                self.d_seq = SEQDANCE_HIDDEN_SIZE
+                hidden_size = self.seq_encoder.config.hidden_size
+                if hidden_size != SEQDANCE_HIDDEN_SIZE:
+                    raise ValueError(
+                        f"{self.model_type} hidden size mismatch: expected {SEQDANCE_HIDDEN_SIZE}, got {hidden_size}"
+                    )
+                self.d_seq = hidden_size
             else:
                 self.d_seq = self.seq_encoder.config.hidden_size
         elif self.model_type == "esmc":

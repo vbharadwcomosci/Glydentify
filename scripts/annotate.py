@@ -165,7 +165,7 @@ class StructParser:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add annotations to structures")
     parser.add_argument("input", type=str, help="folder of the cif file to process")
-    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance"])
+    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance"], help="Fusion-model architecture for attention annotation.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint")
     parser.add_argument("--plddt_threshold", type=float, default=70., help="pLDDT threshold")
     parser.add_argument("--target_donor", type=str, default=None, help="Target donor")
