@@ -29,6 +29,8 @@ from src.dataset import GTDonorDataset, get_collate_fn
 from src.utils import get_struc_seq
 from unimol_tools.data.conformer import UniMolV2Feature
 
+HF_SEQUENCE_MODEL_TYPES = {"esm2", "saprot", "seqdance", "esmdance"}
+
 featureer = UniMolV2Feature()
 
 # Copy donor_smiles and donor_abbr from original script or load from a shared config
@@ -121,7 +123,7 @@ class StructParser:
         self.model_type = model_type
         self.model = model
         self.plddt_threshold = plddt_threshold
-        if model_type in ["esm2", "saprot"]:
+        if model_type in HF_SEQUENCE_MODEL_TYPES:
             self.tokenizer = AutoTokenizer.from_pretrained(model.checkpoint_name)
         elif model_type == "esmc":
             self.tokenizer = model.seq_encoder.tokenizer
@@ -133,7 +135,7 @@ class StructParser:
         aa_seq, _, combined_seq = parsed_seqs[chain_id]
         return aa_seq, combined_seq
     
-    def _esm2_parse(self, struct_path):
+    def _sequence_parse(self, struct_path):
         aa_seq, _ = self.parse_seqs(struct_path)
         tokenized_seq = self.tokenizer([aa_seq], return_tensors="pt", padding="max_length", truncation=False, max_length=len(aa_seq)+2)
         return tokenized_seq
@@ -149,8 +151,8 @@ class StructParser:
         return tokenized_seq
 
     def parse(self, struct_path):
-        if self.model_type == "esm2":
-            return self._esm2_parse(struct_path)
+        if self.model_type in {"esm2", "seqdance", "esmdance"}:
+            return self._sequence_parse(struct_path)
         elif self.model_type == "esmc":
             return self._esmc_parse(struct_path)
         elif self.model_type == "saprot":
@@ -163,7 +165,7 @@ class StructParser:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add annotations to structures")
     parser.add_argument("input", type=str, help="folder of the cif file to process")
-    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc"])
+    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance"])
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint")
     parser.add_argument("--plddt_threshold", type=float, default=70., help="pLDDT threshold")
     parser.add_argument("--target_donor", type=str, default=None, help="Target donor")
@@ -172,7 +174,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.model_type == None:
-        for key_words in ["saprot", "esm2", "esmc"]:
+        for key_words in ["seqdance", "esmdance", "saprot", "esm2", "esmc"]:
             if key_words in args.checkpoint:
                 args.model_type = key_words
                 break

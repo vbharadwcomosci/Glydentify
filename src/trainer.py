@@ -21,6 +21,9 @@ from .model import GTDonorPredictor, MLPPredictor
 from .losses import *
 from .utils import compute_multilabel_metrics, compute_metrics
 
+SAPROT_MODEL_TYPES = {"saprot", "saprot_mlp"}
+ESMC_MODEL_TYPES = {"esmc", "esmc_mlp"}
+
 def check_optimizer_coverage(model, optimizer):
     """
     Verifies that the optimizer is managing all trainable parameters of the model.
@@ -85,22 +88,20 @@ def train_model(df_train, df_val,
         ).to(device)
 
     # Determine Tokenizer, Collate Fn, and Sequence Column
-    if model_type == "saprot_mlp":
-        seq_column = "SaProt Sequence"
-    elif model_type == "saprot":
+    if model_type in SAPROT_MODEL_TYPES:
         seq_column = "SaProt Sequence"
     else:
         seq_column = "Sequence"
 
-    if model_type in ("esmc", "esmc_mlp"):
-        tokenizer = model.seq_encoder.tokenizer if model_type == "esmc" else model.encoder.tokenizer
+    if model_type in ESMC_MODEL_TYPES:
+        tokenizer = model.seq_encoder.tokenizer
         collate_fn = get_collate_fn(tokenizer, is_esmc=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
         collate_fn = get_collate_fn(tokenizer, is_esmc=False)
 
     # Datasets + loaders
-    is_esmc = model_type in ("esmc", "esmc_mlp")
+    is_esmc = model_type in ESMC_MODEL_TYPES
     ds_train = GTDonorDataset(df_train, seq_column,
                               tokenizer, max_seq_len,
                               label2id, label_column="Nucleotide_Sugars",
@@ -264,19 +265,19 @@ def eval_model(model, df_test, batch_size=128, output_name="final_results.json")
     else:
         real_model = model
 
-    if model_type in ("saprot", "saprot_mlp"):
+    if model_type in SAPROT_MODEL_TYPES:
         seq_column = "SaProt Sequence"
     else:
         seq_column = "Sequence"
 
-    if model_type in ("esmc", "esmc_mlp"):
+    if model_type in ESMC_MODEL_TYPES:
         tokenizer = real_model.seq_encoder.tokenizer
         collate_fn = get_collate_fn(tokenizer, is_esmc=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(real_model.checkpoint_name)
         collate_fn = get_collate_fn(tokenizer, is_esmc=False)
 
-    if model_type in ("saprot", "saprot_mlp"):
+    if model_type in SAPROT_MODEL_TYPES:
         max_seq_len = df_test[seq_column].str.len().max() // 2
     else:
         max_seq_len = df_test[seq_column].str.len().max()
@@ -284,7 +285,7 @@ def eval_model(model, df_test, batch_size=128, output_name="final_results.json")
     ds_test  = GTDonorDataset(df_test,   seq_column,
                               tokenizer, max_seq_len,
                               real_model.label2id, label_column="Nucleotide_Sugars",
-                              is_esmc=(model_type in ("esmc", "esmc_mlp")),
+                              is_esmc=(model_type in ESMC_MODEL_TYPES),
                               )
 
     dl_test = DataLoader(ds_test, batch_size=batch_size, collate_fn=collate_fn)

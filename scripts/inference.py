@@ -21,6 +21,10 @@ from src.dataset import GTDonorDataset, get_collate_fn
 from src.utils import get_struc_seq, set_seed, report_metrics, compute_multilabel_metrics
 from src.trainer import eval_model
 
+SAPROT_MODEL_TYPES = {"saprot", "saprot_mlp"}
+ESMC_MODEL_TYPES = {"esmc", "esmc_mlp"}
+SEQUENCE_MODEL_TYPES = {"esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "esmc_mlp"}
+
 def seq_to_structure(struct_path, plddt_threshold, chain_id="A"):
     parsed_seqs = get_struc_seq("bin/foldseek", struct_path, [chain_id], plddt_threshold=plddt_threshold)
     try:
@@ -65,7 +69,7 @@ def inference(checkpoint_path, df, model_type="saprot", batch_size=6, device="cu
     model.to(device)
     model.eval()
 
-    if model_type in ("esm2", "esmc", "esm2_mlp", "esmc_mlp"):
+    if model_type in SEQUENCE_MODEL_TYPES:
         seq_column = "Sequence"
         if "Sequence" not in df.columns and "SaProt Sequence" in df.columns:
             df["Sequence"] = df["SaProt Sequence"].apply(lambda x: x[::2])
@@ -89,7 +93,7 @@ def inference(checkpoint_path, df, model_type="saprot", batch_size=6, device="cu
         return all_probs, all_labels, model
     
     # Otherwise, do inference
-    is_esmc = model_type in ("esmc", "esmc_mlp")
+    is_esmc = model_type in ESMC_MODEL_TYPES
     if is_esmc:
         tokenizer = model.seq_encoder.tokenizer
         collate_fn = get_collate_fn(tokenizer, is_esmc=True)
@@ -98,7 +102,7 @@ def inference(checkpoint_path, df, model_type="saprot", batch_size=6, device="cu
         collate_fn = get_collate_fn(tokenizer, is_esmc=False)
 
     max_seq_len = df[seq_column].str.len().max()
-    if model_type in ("saprot", "saprot_mlp"):
+    if model_type in SAPROT_MODEL_TYPES:
         max_seq_len //= 2
 
     if label_column in df.columns:
@@ -137,14 +141,14 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=6)
     parser.add_argument("--plddt_threshold", type=float, default=70.)
     parser.add_argument("--parse", action="store_true", default=False)
-    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "esm2_mlp", "saprot_mlp", "esmc_mlp"])
+    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"])
     parser.add_argument("--device", type=str, default="cuda:0")
     args = parser.parse_args()
     
     import pickle # ensure imported
     
     if args.model_type == None:
-        for key_words in ["saprot", "esm2", "esmc"]:
+        for key_words in ["seqdance", "esmdance", "saprot", "esm2", "esmc"]:
             if key_words in args.checkpoint:
                 args.model_type = key_words
                 break
@@ -236,4 +240,3 @@ if __name__ == "__main__":
         out_path = os.path.join(save_dir, f"{args.model_type}_probs_{input_stem}.npy")
         np.save(out_path, all_probs)
         print("Saved raw probs to", out_path)
-

@@ -25,6 +25,10 @@ from esm.utils.structure.affine3d import (
 from esm.models.esmc import ESMC
 from esm.utils.constants import esm3 as C
 
+HF_SEQUENCE_MODEL_TYPES = {"saprot", "esm2", "seqdance", "esmdance"}
+SEQDANCE_MODEL_TYPES = {"seqdance", "esmdance"}
+SEQDANCE_HIDDEN_SIZE = 480
+
 class EsmDataset(Dataset):
     def __init__(self, data_dict):
         """
@@ -73,9 +77,12 @@ class GTDonorPredictor(nn.Module):
         self.device = device
 
         # 1) Encoders
-        if self.model_type in ["saprot", "esm2"]:
+        if self.model_type in HF_SEQUENCE_MODEL_TYPES:
             self.seq_encoder = EsmModel.from_pretrained(checkpoint_name)
-            self.d_seq = self.seq_encoder.config.hidden_size
+            if self.model_type in SEQDANCE_MODEL_TYPES:
+                self.d_seq = SEQDANCE_HIDDEN_SIZE
+            else:
+                self.d_seq = self.seq_encoder.config.hidden_size
         elif self.model_type == "esmc":
             if ESMC is None:
                 raise ImportError("esm package is required for ESMC models")
@@ -191,8 +198,8 @@ class GTDonorPredictor(nn.Module):
             seq_pad_mask = (sequence_tokens <= 2) 
 
         else:
-            # SaProt / ESM2
-            assert input_ids is not None, "SaProt/ESM2 requires input_ids"
+            # HF ESM-family encoders (SaProt / ESM2 / SeqDance / ESMDance)
+            assert input_ids is not None, f"{self.model_type} requires input_ids"
             seq_out = self.seq_encoder(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
             seq_repr_cls = seq_out.last_hidden_state[:, 0, :]
             seq_repr_token = seq_out.last_hidden_state

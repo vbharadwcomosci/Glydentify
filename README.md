@@ -87,7 +87,7 @@ When running the container, use the `--gpus all` flag to allow the container to 
 docker run --rm --gpus all \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/checkpoints:/app/checkpoints" \
-  glydentify python scripts/train.py --fold <gta|gtb> --model_type <saprot|esm2|esmc> --batch_size 16 --ckpt_base_dir checkpoints/training_runs
+  glydentify python scripts/train.py --fold <gta|gtb> --model_type <saprot|esm2|esmc|seqdance|esmdance> --batch_size 16 --ckpt_base_dir checkpoints/training_runs
 ```
 
 **Example for Inference:**
@@ -107,21 +107,24 @@ The primary model checkpoints are the UniMol-fusion models used for the main Gly
 - `checkpoints/saprot_unimol/<gta|gtb>/`
 - `checkpoints/esm2_unimol/<gta|gtb>/`
 - `checkpoints/esmc_unimol/<gta|gtb>/`
+- `checkpoints/seqdance_unimol/<gta|gtb>/`
+- `checkpoints/esmdance_unimol/<gta|gtb>/`
 
-The repository also includes MLP-head checkpoints for reviewer/reproducibility checks: `checkpoints/saprot_mlp/<gta|gtb>/`, `checkpoints/esm2_mlp/<gta|gtb>/`, and `checkpoints/esmc_mlp/<gta|gtb>/`. Use the matching `--model_type` value for the checkpoint directory: `saprot`, `esm2`, `esmc`, `saprot_mlp`, `esm2_mlp`, or `esmc_mlp`.
+The repository also includes MLP-head checkpoints for reviewer/reproducibility checks: `checkpoints/saprot_mlp/<gta|gtb>/`, `checkpoints/esm2_mlp/<gta|gtb>/`, and `checkpoints/esmc_mlp/<gta|gtb>/`. Use the matching `--model_type` value for the checkpoint directory: `saprot`, `esm2`, `esmc`, `seqdance`, `esmdance`, `saprot_mlp`, `esm2_mlp`, or `esmc_mlp`.
 
 ### Training
 
-To train the model (supports SaProt, ESM2, ESM-C):
+To train the model (supports SaProt, ESM2, ESM-C, SeqDance, and ESMDance):
 
 ```bash
-python scripts/train.py --fold <gta|gtb> --model_type <saprot|esm2|esmc> --batch_size 16 --ckpt_base_dir checkpoints/training_runs
+python scripts/train.py --fold <gta|gtb> --model_type <saprot|esm2|esmc|seqdance|esmdance> --batch_size 16 --ckpt_base_dir checkpoints/training_runs
 ```
 
 Arguments:
 
 - `--fold`: Name of the dataset fold (expected in `data/<fold>/` or `../data/<fold>`).
-- `--model_type`: Model architecture (`saprot`, `esm2`, `esmc`). Default: `saprot`. MLP-head model types are available for reviewer/reproducibility checks but are not the primary recommended workflow.
+- `--model_type`: Model architecture (`saprot`, `esm2`, `esmc`, `seqdance`, `esmdance`). Default: `saprot`. MLP-head model types are available for reviewer/reproducibility checks but are not the primary recommended workflow.
+- `--checkpoint_name`: Optional encoder checkpoint override. SeqDance and ESMDance default to the Hugging Face weights `ChaoHou/SeqDance` and `ChaoHou/ESMDance`.
 - `--ckpt_base_dir`: Directory for new training outputs. Set this explicitly; the script default is a lab-specific absolute path.
 - `--train_unimol` (optional): Fine-tune the UniMol encoder.
 - `--train_seq_encoder` (optional): Fine-tune the sequence encoder (SaProt/ESM).
@@ -131,7 +134,7 @@ Arguments:
 To run inference on a folder of protein structures (`.pdb` or `.cif`) using a trained checkpoint:
 
 ```bash
-python scripts/inference.py <input_folder> --parse --checkpoint <path_to_checkpoint> --model_type <saprot|esm2|esmc|saprot_mlp|esm2_mlp|esmc_mlp>
+python scripts/inference.py <input_folder> --parse --checkpoint <path_to_checkpoint> --model_type <saprot|esm2|esmc|seqdance|esmdance|saprot_mlp|esm2_mlp|esmc_mlp>
 ```
 
 The `--parse` flag creates `<input_folder>/saprot_sequences_<plddt_threshold>.csv` from the structures. If that CSV already exists, `--parse` can be omitted.
@@ -155,7 +158,7 @@ When the input CSV includes `Nucleotide_Sugars`, `max_identity`, and `Organism(K
 To visualize attention weights on the protein structure:
 
 ```bash
-python scripts/annotate.py <input_folder> --checkpoint <path_to_checkpoint> --model_type <saprot|esm2|esmc> --target_donor <donor_name>
+python scripts/annotate.py <input_folder> --checkpoint <path_to_checkpoint> --model_type <saprot|esm2|esmc|seqdance|esmdance> --target_donor <donor_name>
 ```
 
 ## License
@@ -180,4 +183,3 @@ If you use this code or data, please cite our paper:
 }
 ```
 > This citation reflects the current bioRxiv preprint. A peer-reviewed version is under consideration; citation will be updated upon acceptance.
-

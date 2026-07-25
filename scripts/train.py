@@ -16,11 +16,19 @@ from src.trainer import train_model, eval_model
 from src.losses import get_criterion, class_alpha_from_counts
 from src.utils import set_seed
 
+SAPROT_MODEL_TYPES = {"saprot", "saprot_mlp"}
+ESM2_MODEL_TYPES = {"esm2", "esm2_mlp"}
+ESMC_MODEL_TYPES = {"esmc", "esmc_mlp"}
+SEQDANCE_DEFAULT_CHECKPOINTS = {
+    "seqdance": "ChaoHou/SeqDance",
+    "esmdance": "ChaoHou/ESMDance",
+}
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--fold", type=str, required=True, help="Path to the dataset (folder name in data/ or 'gta'/'gtb').")
-    parser.add_argument("--model_type", type=str, default="saprot", choices=["saprot", "esm2", "esmc", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture.")
+    parser.add_argument("--model_type", type=str, default="saprot", choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture.")
     parser.add_argument("--checkpoint_name", type=str, default=None, help="HF checkpoint or path to model weights.")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--max_seq_len", type=int, default=1024)
@@ -50,12 +58,14 @@ if __name__ == "__main__":
 
     # Set default checkpoint names if not provided
     if args.checkpoint_name is None:
-        if args.model_type in ("saprot", "saprot_mlp"):
+        if args.model_type in SAPROT_MODEL_TYPES:
             args.checkpoint_name = "westlake-repl/SaProt_650M_AF2"
-        elif args.model_type in ("esm2", "esm2_mlp"):
+        elif args.model_type in ESM2_MODEL_TYPES:
             args.checkpoint_name = "facebook/esm2_t33_650M_UR50D"
-        elif args.model_type in ("esmc", "esmc_mlp"):
+        elif args.model_type in ESMC_MODEL_TYPES:
             args.checkpoint_name = "esmc_600m"
+        elif args.model_type in SEQDANCE_DEFAULT_CHECKPOINTS:
+            args.checkpoint_name = SEQDANCE_DEFAULT_CHECKPOINTS[args.model_type]
 
     # Load data — custom paths take priority over fold-derived defaults
     def _load_csv(custom_path, fold_path):
@@ -70,7 +80,7 @@ if __name__ == "__main__":
     df_te = _load_csv(args.test_csv, f"{args.fold}/test.csv")
 
     # Drop rows missing the sequence column required by the chosen model
-    seq_col = "SaProt Sequence" if args.model_type == "saprot" else "Sequence"
+    seq_col = "SaProt Sequence" if args.model_type in SAPROT_MODEL_TYPES else "Sequence"
     if seq_col in df_tr.columns:
         before = len(df_tr)
         df_tr = df_tr.dropna(subset=[seq_col]).reset_index(drop=True)
@@ -82,7 +92,7 @@ if __name__ == "__main__":
     df_te["Nucleotide_Sugars"] = df_te["Nucleotide_Sugars"].apply(ast.literal_eval)
 
     # Determine validation max len based on column
-    if args.model_type == "saprot":
+    if args.model_type in SAPROT_MODEL_TYPES:
         col = "SaProt Sequence"
         if col not in df_tr.columns:
              # Fallback if specific column missing? OR rename logic? 
