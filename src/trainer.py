@@ -94,7 +94,10 @@ def train_model(df_train, df_val,
         seq_column = "Sequence"
 
     if model_type in ESMC_MODEL_TYPES:
-        tokenizer = model.seq_encoder.tokenizer
+        seq_encoder = getattr(model, "seq_encoder", None)
+        if seq_encoder is None:
+            raise AttributeError(f"{model_type} is missing seq_encoder for tokenizer retrieval")
+        tokenizer = seq_encoder.tokenizer
         collate_fn = get_collate_fn(tokenizer, is_esmc=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
@@ -271,7 +274,10 @@ def eval_model(model, df_test, batch_size=128, output_name="final_results.json")
         seq_column = "Sequence"
 
     if model_type in ESMC_MODEL_TYPES:
-        tokenizer = real_model.seq_encoder.tokenizer
+        seq_encoder = getattr(real_model, "seq_encoder", None)
+        if seq_encoder is None:
+            raise AttributeError(f"{model_type} is missing seq_encoder for tokenizer retrieval")
+        tokenizer = seq_encoder.tokenizer
         collate_fn = get_collate_fn(tokenizer, is_esmc=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(real_model.checkpoint_name)

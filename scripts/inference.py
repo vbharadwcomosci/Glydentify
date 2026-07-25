@@ -141,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=6)
     parser.add_argument("--plddt_threshold", type=float, default=70.)
     parser.add_argument("--parse", action="store_true", default=False)
-    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture. MLP variants are only available for saprot/esm2/esmc.")
+    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture. MLP variants (suffix _mlp) are only available for saprot, esm2, and esmc.")
     parser.add_argument("--device", type=str, default="cuda:0")
     args = parser.parse_args()
     

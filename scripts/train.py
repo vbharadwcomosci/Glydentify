@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--fold", type=str, required=True, help="Path to the dataset (folder name in data/ or 'gta'/'gtb').")
-    parser.add_argument("--model_type", type=str, default="saprot", choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture. MLP variants are only available for saprot/esm2/esmc.")
+    parser.add_argument("--model_type", type=str, default="saprot", choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture. MLP variants (suffix _mlp) are only available for saprot, esm2, and esmc.")
     parser.add_argument("--checkpoint_name", type=str, default=None, help="HF checkpoint or path to model weights.")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--max_seq_len", type=int, default=1024)
