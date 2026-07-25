@@ -30,6 +30,7 @@ from src.utils import get_struc_seq
 from unimol_tools.data.conformer import UniMolV2Feature
 
 HF_SEQUENCE_MODEL_TYPES = {"esm2", "saprot", "seqdance", "esmdance"}
+AA_SEQUENCE_MODEL_TYPES = HF_SEQUENCE_MODEL_TYPES - {"saprot"}
 
 featureer = UniMolV2Feature()
 
@@ -151,7 +152,7 @@ class StructParser:
         return tokenized_seq
 
     def parse(self, struct_path):
-        if self.model_type in {"esm2", "seqdance", "esmdance"}:
+        if self.model_type in AA_SEQUENCE_MODEL_TYPES:
             return self._sequence_parse(struct_path)
         elif self.model_type == "esmc":
             return self._esmc_parse(struct_path)
@@ -174,7 +175,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.model_type == None:
-        for key_words in ["seqdance", "esmdance", "saprot", "esm2", "esmc"]:
+        for key_words in ["esmdance", "seqdance", "saprot", "esmc", "esm2"]:
             if key_words in args.checkpoint:
                 args.model_type = key_words
                 break

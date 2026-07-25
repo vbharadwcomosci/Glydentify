@@ -148,7 +148,7 @@ if __name__ == "__main__":
     import pickle # ensure imported
     
     if args.model_type == None:
-        for key_words in ["seqdance", "esmdance", "saprot", "esm2", "esmc"]:
+        for key_words in ["esmdance", "seqdance", "saprot", "esmc", "esm2"]:
             if key_words in args.checkpoint:
                 args.model_type = key_words
                 break
