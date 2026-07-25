@@ -22,6 +22,12 @@ from .model_types import MLP_MODEL_TYPES, SAPROT_MODEL_TYPES, ESMC_MODEL_TYPES
 from .losses import *
 from .utils import compute_multilabel_metrics, compute_metrics
 
+def _get_esmc_tokenizer(model, model_type):
+    seq_encoder = getattr(model, "seq_encoder", None)
+    if seq_encoder is None:
+        raise AttributeError(f"{model_type} is missing seq_encoder for tokenizer retrieval")
+    return seq_encoder.tokenizer
+
 def check_optimizer_coverage(model, optimizer):
     """
     Verifies that the optimizer is managing all trainable parameters of the model.
@@ -91,10 +97,7 @@ def train_model(df_train, df_val,
         seq_column = "Sequence"
 
     if model_type in ESMC_MODEL_TYPES:
-        seq_encoder = getattr(model, "seq_encoder", None)
-        if seq_encoder is None:
-            raise AttributeError(f"{model_type} is missing seq_encoder for tokenizer retrieval")
-        tokenizer = seq_encoder.tokenizer
+        tokenizer = _get_esmc_tokenizer(model, model_type)
         collate_fn = get_collate_fn(tokenizer, is_esmc=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(checkpoint_name)
@@ -271,10 +274,7 @@ def eval_model(model, df_test, batch_size=128, output_name="final_results.json")
         seq_column = "Sequence"
 
     if model_type in ESMC_MODEL_TYPES:
-        seq_encoder = getattr(real_model, "seq_encoder", None)
-        if seq_encoder is None:
-            raise AttributeError(f"{model_type} is missing seq_encoder for tokenizer retrieval")
-        tokenizer = seq_encoder.tokenizer
+        tokenizer = _get_esmc_tokenizer(real_model, model_type)
         collate_fn = get_collate_fn(tokenizer, is_esmc=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(real_model.checkpoint_name)

@@ -139,7 +139,7 @@ class StructParser:
         aa_seq, _, combined_seq = parsed_seqs[chain_id]
         return aa_seq, combined_seq
     
-    def _sequence_parse(self, struct_path):
+    def _non_saprot_hf_parse(self, struct_path):
         aa_seq, _ = self.parse_seqs(struct_path)
         tokenized_seq = self.tokenizer([aa_seq], return_tensors="pt", padding="max_length", truncation=False, max_length=len(aa_seq)+2)
         return tokenized_seq
@@ -156,7 +156,7 @@ class StructParser:
 
     def parse(self, struct_path):
         if self.model_type in NON_SAPROT_HF_MODEL_TYPES:
-            return self._sequence_parse(struct_path)
+            return self._non_saprot_hf_parse(struct_path)
         elif self.model_type == "esmc":
             return self._esmc_parse(struct_path)
         elif self.model_type == "saprot":

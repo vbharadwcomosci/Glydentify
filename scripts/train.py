@@ -16,6 +16,7 @@ from src.model_types import (
     SAPROT_MODEL_TYPES,
     ESM2_MODEL_TYPES,
     ESMC_MODEL_TYPES,
+    MLP_MODEL_TYPES,
     SEQDANCE_DEFAULT_CHECKPOINTS,
     TRAIN_INFERENCE_MODEL_TYPES,
 )
@@ -49,6 +50,9 @@ if __name__ == "__main__":
     parser.add_argument("--ckpt_base_dir", type=str, default="/mnt/storage1/ruili/Glydentify/ckpts", help="Base directory for saving checkpoints.")
 
     args = parser.parse_args()
+
+    if args.model_type.endswith("_mlp") and args.model_type not in MLP_MODEL_TYPES:
+        raise ValueError(f"Unsupported MLP model_type: {args.model_type}")
 
     if args.seed is not None:
         set_seed(args.seed)
