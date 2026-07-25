@@ -15,7 +15,6 @@ from tqdm import tqdm
 from glob import glob
 import pickle
 import argparse
-import re
 from Bio.PDB import MMCIFParser, PDBParser
 from Bio.PDB.mmcifio import MMCIFIO
 from Bio.PDB import PDBIO
@@ -25,20 +24,16 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from transformers import AutoTokenizer
 from esm.utils import encoding
+from src.model_types import (
+    ANNOTATION_MODEL_TYPES,
+    HF_SEQUENCE_MODEL_TYPES,
+    NON_SAPROT_HF_MODEL_TYPES,
+    infer_model_type_from_checkpoint,
+)
 from src.model import GTDonorPredictor
 from src.dataset import GTDonorDataset, get_collate_fn
 from src.utils import get_struc_seq
 from unimol_tools.data.conformer import UniMolV2Feature
-
-HF_SEQUENCE_MODEL_TYPES = {"esm2", "saprot", "seqdance", "esmdance"}
-NON_SAPROT_HF_MODEL_TYPES = HF_SEQUENCE_MODEL_TYPES - {"saprot"}
-
-def infer_model_type_from_checkpoint(checkpoint_path):
-    tokens = set(re.split(r"[\\/_.-]+", checkpoint_path.lower()))
-    for model_type in ("esmdance", "seqdance", "saprot", "esmc", "esm2"):
-        if model_type in tokens:
-            return model_type
-    return None
 
 featureer = UniMolV2Feature()
 
@@ -174,7 +169,7 @@ class StructParser:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Add annotations to structures")
     parser.add_argument("input", type=str, help="folder of the cif file to process")
-    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance"], help="Fusion-model architecture for attention annotation.")
+    parser.add_argument("--model_type", type=str, default=None, choices=ANNOTATION_MODEL_TYPES, help="Fusion-model architecture for attention annotation.")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint")
     parser.add_argument("--plddt_threshold", type=float, default=70., help="pLDDT threshold")
     parser.add_argument("--target_donor", type=str, default=None, help="Target donor")

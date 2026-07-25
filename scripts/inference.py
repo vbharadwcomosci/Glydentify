@@ -5,7 +5,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import json
 from glob import glob
-import re
 import pandas as pd
 import argparse
 from transformers import AutoTokenizer
@@ -17,21 +16,17 @@ from tqdm import tqdm
 import numpy as np
 from collections import defaultdict
 import ast
+from src.model_types import (
+    SAPROT_MODEL_TYPES,
+    ESMC_MODEL_TYPES,
+    SEQUENCE_INPUT_MODEL_TYPES,
+    TRAIN_INFERENCE_MODEL_TYPES,
+    infer_model_type_from_checkpoint,
+)
 from src.model import GTDonorPredictor, MLPPredictor
 from src.dataset import GTDonorDataset, get_collate_fn
 from src.utils import get_struc_seq, set_seed, report_metrics, compute_multilabel_metrics
 from src.trainer import eval_model
-
-SAPROT_MODEL_TYPES = {"saprot", "saprot_mlp"}
-ESMC_MODEL_TYPES = {"esmc", "esmc_mlp"}
-SEQUENCE_MODEL_TYPES = {"esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "esmc_mlp"}
-
-def infer_model_type_from_checkpoint(checkpoint_path):
-    tokens = set(re.split(r"[\\/_.-]+", checkpoint_path.lower()))
-    for model_type in ("esmdance", "seqdance", "saprot", "esmc", "esm2"):
-        if model_type in tokens:
-            return model_type
-    return None
 
 def seq_to_structure(struct_path, plddt_threshold, chain_id="A"):
     parsed_seqs = get_struc_seq("bin/foldseek", struct_path, [chain_id], plddt_threshold=plddt_threshold)
@@ -77,7 +72,7 @@ def inference(checkpoint_path, df, model_type="saprot", batch_size=6, device="cu
     model.to(device)
     model.eval()
 
-    if model_type in SEQUENCE_MODEL_TYPES:
+    if model_type in SEQUENCE_INPUT_MODEL_TYPES:
         seq_column = "Sequence"
         if "Sequence" not in df.columns and "SaProt Sequence" in df.columns:
             df["Sequence"] = df["SaProt Sequence"].apply(lambda x: x[::2])
@@ -149,7 +144,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=6)
     parser.add_argument("--plddt_threshold", type=float, default=70.)
     parser.add_argument("--parse", action="store_true", default=False)
-    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture. SeqDance and ESMDance are supported as encoder-fusion models only; MLP variants (suffix _mlp) are available only for saprot, esm2, and esmc.")
+    parser.add_argument("--model_type", type=str, default=None, choices=TRAIN_INFERENCE_MODEL_TYPES, help="Model architecture. SeqDance and ESMDance are supported as encoder-fusion models only; MLP variants (suffix _mlp) are available only for saprot, esm2, and esmc.")
     parser.add_argument("--device", type=str, default="cuda:0")
     args = parser.parse_args()
     

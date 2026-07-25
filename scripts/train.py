@@ -12,23 +12,22 @@ import torch
 import pandas as pd
 import wandb
 
+from src.model_types import (
+    SAPROT_MODEL_TYPES,
+    ESM2_MODEL_TYPES,
+    ESMC_MODEL_TYPES,
+    SEQDANCE_DEFAULT_CHECKPOINTS,
+    TRAIN_INFERENCE_MODEL_TYPES,
+)
 from src.trainer import train_model, eval_model
 from src.losses import get_criterion, class_alpha_from_counts
 from src.utils import set_seed
-
-SAPROT_MODEL_TYPES = {"saprot", "saprot_mlp"}
-ESM2_MODEL_TYPES = {"esm2", "esm2_mlp"}
-ESMC_MODEL_TYPES = {"esmc", "esmc_mlp"}
-SEQDANCE_DEFAULT_CHECKPOINTS = {
-    "seqdance": "ChaoHou/SeqDance",
-    "esmdance": "ChaoHou/ESMDance",
-}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--fold", type=str, required=True, help="Path to the dataset (folder name in data/ or 'gta'/'gtb').")
-    parser.add_argument("--model_type", type=str, default="saprot", choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture. SeqDance and ESMDance are supported as encoder-fusion models only; MLP variants (suffix _mlp) are available only for saprot, esm2, and esmc.")
+    parser.add_argument("--model_type", type=str, default="saprot", choices=TRAIN_INFERENCE_MODEL_TYPES, help="Model architecture. SeqDance and ESMDance are supported as encoder-fusion models only; MLP variants (suffix _mlp) are available only for saprot, esm2, and esmc.")
     parser.add_argument("--checkpoint_name", type=str, default=None, help="HF checkpoint or path to model weights.")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--max_seq_len", type=int, default=1024)

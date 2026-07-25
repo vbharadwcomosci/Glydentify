@@ -25,9 +25,7 @@ from esm.utils.structure.affine3d import (
 from esm.models.esmc import ESMC
 from esm.utils.constants import esm3 as C
 
-HF_SEQUENCE_MODEL_TYPES = {"saprot", "esm2", "seqdance", "esmdance"}
-SEQDANCE_MODEL_TYPES = {"seqdance", "esmdance"}
-SEQDANCE_HIDDEN_SIZE = 480
+from .model_types import HF_SEQUENCE_MODEL_TYPES, SEQDANCE_MODEL_TYPES, SEQDANCE_HIDDEN_SIZE
 
 class EsmDataset(Dataset):
     def __init__(self, data_dict):

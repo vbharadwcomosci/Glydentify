@@ -18,11 +18,9 @@ import random
 
 from .dataset import GTDonorDataset, get_collate_fn
 from .model import GTDonorPredictor, MLPPredictor
+from .model_types import MLP_MODEL_TYPES, SAPROT_MODEL_TYPES, ESMC_MODEL_TYPES
 from .losses import *
 from .utils import compute_multilabel_metrics, compute_metrics
-
-SAPROT_MODEL_TYPES = {"saprot", "saprot_mlp"}
-ESMC_MODEL_TYPES = {"esmc", "esmc_mlp"}
 
 def check_optimizer_coverage(model, optimizer):
     """
@@ -67,8 +65,7 @@ def train_model(df_train, df_val,
                 seed=None):
 
     # Initialize Model FIRST to get the tokenizer (especially for ESMC)
-    mlp_types = {"esm2_mlp", "saprot_mlp", "esmc_mlp"}
-    if model_type in mlp_types:
+    if model_type in MLP_MODEL_TYPES:
         model = MLPPredictor(
             checkpoint_name=checkpoint_name,
             label2id=label2id,
