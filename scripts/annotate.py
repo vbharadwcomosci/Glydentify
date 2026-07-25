@@ -15,6 +15,7 @@ from tqdm import tqdm
 from glob import glob
 import pickle
 import argparse
+import re
 from Bio.PDB import MMCIFParser, PDBParser
 from Bio.PDB.mmcifio import MMCIFIO
 from Bio.PDB import PDBIO
@@ -30,7 +31,14 @@ from src.utils import get_struc_seq
 from unimol_tools.data.conformer import UniMolV2Feature
 
 HF_SEQUENCE_MODEL_TYPES = {"esm2", "saprot", "seqdance", "esmdance"}
-AA_SEQUENCE_MODEL_TYPES = HF_SEQUENCE_MODEL_TYPES - {"saprot"}
+NON_SAPROT_HF_MODEL_TYPES = HF_SEQUENCE_MODEL_TYPES - {"saprot"}
+
+def infer_model_type_from_checkpoint(checkpoint_path):
+    tokens = set(re.split(r"[\\/_.-]+", checkpoint_path.lower()))
+    for model_type in ("esmdance", "seqdance", "saprot", "esmc", "esm2"):
+        if model_type in tokens:
+            return model_type
+    return None
 
 featureer = UniMolV2Feature()
 
@@ -152,7 +160,7 @@ class StructParser:
         return tokenized_seq
 
     def parse(self, struct_path):
-        if self.model_type in AA_SEQUENCE_MODEL_TYPES:
+        if self.model_type in NON_SAPROT_HF_MODEL_TYPES:
             return self._sequence_parse(struct_path)
         elif self.model_type == "esmc":
             return self._esmc_parse(struct_path)
@@ -175,10 +183,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.model_type == None:
-        for key_words in ["esmdance", "seqdance", "saprot", "esmc", "esm2"]:
-            if key_words in args.checkpoint:
-                args.model_type = key_words
-                break
+        args.model_type = infer_model_type_from_checkpoint(args.checkpoint)
         if args.model_type == None:
             raise ValueError("Model type not specified and could not be inferred from checkpoint path.")
         print("Model type not specified, using", args.model_type) 

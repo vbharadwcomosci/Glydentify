@@ -5,6 +5,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import json
 from glob import glob
+import re
 import pandas as pd
 import argparse
 from transformers import AutoTokenizer
@@ -24,6 +25,13 @@ from src.trainer import eval_model
 SAPROT_MODEL_TYPES = {"saprot", "saprot_mlp"}
 ESMC_MODEL_TYPES = {"esmc", "esmc_mlp"}
 SEQUENCE_MODEL_TYPES = {"esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "esmc_mlp"}
+
+def infer_model_type_from_checkpoint(checkpoint_path):
+    tokens = set(re.split(r"[\\/_.-]+", checkpoint_path.lower()))
+    for model_type in ("esmdance", "seqdance", "saprot", "esmc", "esm2"):
+        if model_type in tokens:
+            return model_type
+    return None
 
 def seq_to_structure(struct_path, plddt_threshold, chain_id="A"):
     parsed_seqs = get_struc_seq("bin/foldseek", struct_path, [chain_id], plddt_threshold=plddt_threshold)
@@ -141,17 +149,14 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=6)
     parser.add_argument("--plddt_threshold", type=float, default=70.)
     parser.add_argument("--parse", action="store_true", default=False)
-    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture. MLP variants (suffix _mlp) are only available for saprot, esm2, and esmc.")
+    parser.add_argument("--model_type", type=str, default=None, choices=["saprot", "esm2", "esmc", "seqdance", "esmdance", "esm2_mlp", "saprot_mlp", "esmc_mlp"], help="Model architecture. SeqDance and ESMDance are supported as encoder-fusion models only; MLP variants (suffix _mlp) are available only for saprot, esm2, and esmc.")
     parser.add_argument("--device", type=str, default="cuda:0")
     args = parser.parse_args()
     
     import pickle # ensure imported
     
     if args.model_type == None:
-        for key_words in ["esmdance", "seqdance", "saprot", "esmc", "esm2"]:
-            if key_words in args.checkpoint:
-                args.model_type = key_words
-                break
+        args.model_type = infer_model_type_from_checkpoint(args.checkpoint)
         if args.model_type == None:
             raise ValueError("Model type not specified and could not be inferred from checkpoint path.")
         print("Model type not specified, using", args.model_type)
