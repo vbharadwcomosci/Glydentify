@@ -25,7 +25,7 @@ from esm.utils.structure.affine3d import (
 from esm.models.esmc import ESMC
 from esm.utils.constants import esm3 as C
 
-from .model_types import HF_SEQUENCE_MODEL_TYPES, SEQDANCE_MODEL_TYPES, SEQDANCE_HIDDEN_SIZE
+from .model_types import HF_SEQUENCE_MODEL_TYPES, SEQDANCE_MODEL_TYPES, SEQDANCE_HIDDEN_SIZE, SEQDANCE_DEFAULT_CHECKPOINTS
 
 class EsmDataset(Dataset):
     def __init__(self, data_dict):
@@ -61,6 +61,7 @@ class GTDonorPredictor(nn.Module):
                  checkpoint: Dict = None,
                  cross_attn_heads: int = 4,
                  proj_dim: int = 256,
+                 dynamics_encoder: bool = False,
                  device: torch.device = torch.device("cuda")):
         super().__init__()
         self.model_type = model_type.lower()
@@ -71,6 +72,7 @@ class GTDonorPredictor(nn.Module):
         self.id2label = {i: l for l, i in label2id.items()}
         self.train_unimol = train_unimol
         self.train_seq_encoder = train_seq_encoder
+        self.dynamics_encoder_enabled = dynamics_encoder
         self.proj_dim = proj_dim
         self.device = device
 
@@ -96,6 +98,21 @@ class GTDonorPredictor(nn.Module):
         else:
             raise ValueError(f"Unknown model_type: {model_type}")
 
+        self.d_dynamics = 0
+        if self.dynamics_encoder_enabled:
+            if self.model_type == "esmc":
+                raise ValueError("dynamics_encoder is not supported for esmc model_type")
+            self.dynamics_encoder = EsmModel.from_pretrained(SEQDANCE_DEFAULT_CHECKPOINTS["seqdance"])
+            self.d_dynamics = self.dynamics_encoder.config.hidden_size
+            if self.d_dynamics != SEQDANCE_HIDDEN_SIZE:
+                raise ValueError(
+                    f"dynamics hidden size mismatch: expected {SEQDANCE_HIDDEN_SIZE}, got {self.d_dynamics}"
+                )
+            for p in self.dynamics_encoder.parameters():
+                p.requires_grad = False
+        else:
+            self.dynamics_encoder = None
+
         self.unimol = UniMolV2Model(model_size=unimol_size)
         self.d_mol = self.unimol.args.encoder_embed_dim
         if not train_unimol:
@@ -118,25 +135,35 @@ class GTDonorPredictor(nn.Module):
             nn.GELU(),
             nn.LayerNorm(self.d_mol)
         )
+        if self.dynamics_encoder_enabled:
+            self.dynamics_adapter = nn.Sequential(
+                nn.Linear(self.d_dynamics, self.d_dynamics),
+                nn.GELU(),
+                nn.LayerNorm(self.d_dynamics)
+            )
+        else:
+            self.dynamics_adapter = None
+
+        self.d_seq_fused = self.d_seq + (self.d_dynamics if self.dynamics_encoder_enabled else 0)
 
         # 3) Projections into final shared space
-        self.proj_seq = nn.Linear(self.d_seq, self.proj_dim)
+        self.proj_seq = nn.Linear(self.d_seq_fused, self.proj_dim)
         self.proj_mol = nn.Linear(self.d_mol, self.proj_dim)
 
         # 4) Cross-attention (batch_first)
         self.cross_attn_seq = nn.MultiheadAttention(
-            embed_dim=self.d_seq, kdim=self.d_mol, vdim=self.d_mol,
+            embed_dim=self.d_seq_fused, kdim=self.d_mol, vdim=self.d_mol,
             num_heads=cross_attn_heads, dropout=0.1, batch_first=True,
         )
         self.cross_attn_mol = nn.MultiheadAttention(
-            embed_dim=self.d_mol, kdim=self.d_seq, vdim=self.d_seq,
+            embed_dim=self.d_mol, kdim=self.d_seq_fused, vdim=self.d_seq_fused,
             num_heads=cross_attn_heads, dropout=0.1, batch_first=True,
         )
 
         # 5) Post-attention blocks
         self.seq_attn_dropout = nn.Dropout(0.1)
         self.mol_attn_dropout = nn.Dropout(0.1)
-        self.seq_attn_ln = nn.LayerNorm(self.d_seq)
+        self.seq_attn_ln = nn.LayerNorm(self.d_seq_fused)
         self.mol_attn_ln = nn.LayerNorm(self.d_mol)
         self.fuse_ln = nn.LayerNorm(2 * self.proj_dim)
 
@@ -207,6 +234,15 @@ class GTDonorPredictor(nn.Module):
             
             seq_pad_mask = (input_ids <= 2)
 
+        dyn_repr_cls = None
+        dyn_repr_token = None
+        if self.dynamics_encoder_enabled:
+            if input_ids is None:
+                raise ValueError("dynamics_encoder requires input_ids")
+            dyn_out = self.dynamics_encoder(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
+            dyn_repr_cls = dyn_out.last_hidden_state[:, 0, :]
+            dyn_repr_token = dyn_out.last_hidden_state
+
         if self.train_unimol:
             tok = {k: v.to(seq_repr_cls.device) for k, v in self.tokenized_donor.items()}
             mol_out = self.unimol(**tok, return_repr=True, return_atomic_reprs=True)
@@ -219,6 +255,15 @@ class GTDonorPredictor(nn.Module):
         # 2) ADAPTER PASS: Translate all representations into the shared interaction space
         adapted_seq_cls = self.seq_adapter(seq_repr_cls)
         adapted_seq_token = self.seq_adapter(seq_repr_token)
+        if self.dynamics_encoder_enabled:
+            adapted_dyn_cls = self.dynamics_adapter(dyn_repr_cls)
+            adapted_dyn_token = self.dynamics_adapter(dyn_repr_token)
+            seq_len = min(adapted_seq_token.size(1), adapted_dyn_token.size(1))
+            adapted_seq_token = torch.cat(
+                [adapted_seq_token[:, :seq_len, :], adapted_dyn_token[:, :seq_len, :]], dim=-1
+            )
+            adapted_seq_cls = torch.cat([adapted_seq_cls, adapted_dyn_cls], dim=-1)
+            seq_pad_mask = seq_pad_mask[:, :seq_len]
 
         adapted_donor_cls = self.mol_adapter(donor_repr_cls)
         adapted_donor_atomic = [self.mol_adapter(t) for t in donor_repr_atomic]
@@ -243,11 +288,11 @@ class GTDonorPredictor(nn.Module):
         
         # ---- Mol -> Seq Attention ----
         q_mol = adapted_donor_cls.unsqueeze(0).expand(B, -1, -1).reshape(B * N_donor, 1, self.d_mol)
-        kv_seq = adapted_seq_token.unsqueeze(1).expand(-1, N_donor, -1, -1).reshape(B * N_donor, -1, self.d_seq)
+        kv_seq = adapted_seq_token.unsqueeze(1).expand(-1, N_donor, -1, -1).reshape(B * N_donor, -1, self.d_seq_fused)
         kv_seq_pad_mask = seq_pad_mask.unsqueeze(1).expand(-1, N_donor, -1).reshape(B * N_donor, -1)
         
         # ---- Seq -> Mol Attention ----
-        q_seq = adapted_seq_cls.unsqueeze(1).expand(-1, N_donor, -1).reshape(B * N_donor, 1, self.d_seq)
+        q_seq = adapted_seq_cls.unsqueeze(1).expand(-1, N_donor, -1).reshape(B * N_donor, 1, self.d_seq_fused)
         kv_mol = padded_atomic_kv.unsqueeze(0).expand(B, -1, -1, -1).reshape(B * N_donor, -1, self.d_mol)
         kv_mol_pad_mask = atomic_pad_mask.unsqueeze(0).expand(B, -1, -1).reshape(B * N_donor, -1)
 
@@ -259,7 +304,7 @@ class GTDonorPredictor(nn.Module):
 
         attn_seq, aw_mol = self.cross_attn_seq(q_seq, kv_mol, kv_mol, key_padding_mask=kv_mol_pad_mask)
         out_seq = self.seq_attn_ln(q_seq + self.seq_attn_dropout(attn_seq))
-        out_seq = out_seq.view(B, N_donor, self.d_seq) # Reshape back: (B, N_d, d_seq)
+        out_seq = out_seq.view(B, N_donor, self.d_seq_fused) # Reshape back: (B, N_d, d_seq)
         aw_mol = aw_mol.view(B, N_donor, -1) # Reshape back: (B, N_d, L_seq)
 
         # 6) FUSION & CLASSIFICATION
@@ -301,6 +346,7 @@ class GTDonorPredictor(nn.Module):
             "train_seq_encoder": False, # usually False for inference
             "proj_dim": self.proj_dim,
             "cross_attn_heads": self.cross_attn_mol.num_heads, 
+            "dynamics_encoder": self.dynamics_encoder_enabled,
         }
         # Custom state dict filtering
         full_state_dict = self.state_dict()
@@ -334,6 +380,7 @@ class GTDonorPredictor(nn.Module):
              params["checkpoint_name"] = params.pop("seq_encoder_ckpt")
         if "train_saprot" in params:
              params["train_seq_encoder"] = params.pop("train_saprot")
+        params.setdefault("dynamics_encoder", False)
 
         # checkpoint['params'] = params
         # torch.save(checkpoint, checkpoint_path)
