@@ -263,12 +263,8 @@ class GTDonorPredictor(nn.Module):
                     f"Sequence length mismatch between primary and dynamics encoders: "
                     f"{adapted_seq_token.size(1)} vs {adapted_dyn_token.size(1)}"
                 )
-            seq_len = adapted_seq_token.size(1)
-            adapted_seq_token = torch.cat(
-                [adapted_seq_token[:, :seq_len, :], adapted_dyn_token[:, :seq_len, :]], dim=-1
-            )
+            adapted_seq_token = torch.cat([adapted_seq_token, adapted_dyn_token], dim=-1)
             adapted_seq_cls = torch.cat([adapted_seq_cls, adapted_dyn_cls], dim=-1)
-            seq_pad_mask = seq_pad_mask[:, :seq_len]
 
         adapted_donor_cls = self.mol_adapter(donor_repr_cls)
         adapted_donor_atomic = [self.mol_adapter(t) for t in donor_repr_atomic]
