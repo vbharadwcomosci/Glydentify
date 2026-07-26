@@ -238,9 +238,7 @@ class GTDonorPredictor(nn.Module):
         dyn_repr_token = None
         if self.dynamics_encoder_enabled:
             if input_ids is None:
-                raise ValueError(
-                    f"dynamics_encoder requires input_ids, but model_type '{self.model_type}' does not provide them"
-                )
+                raise ValueError("dynamics_encoder requires input_ids in forward inputs")
             dyn_out = self.dynamics_encoder(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
             dyn_repr_cls = dyn_out.last_hidden_state[:, 0, :]
             dyn_repr_token = dyn_out.last_hidden_state
@@ -260,8 +258,12 @@ class GTDonorPredictor(nn.Module):
         if self.dynamics_encoder_enabled:
             adapted_dyn_cls = self.dynamics_adapter(dyn_repr_cls)
             adapted_dyn_token = self.dynamics_adapter(dyn_repr_token)
-            # Keep token-wise fusion aligned if encoder tokenization lengths differ.
-            seq_len = min(adapted_seq_token.size(1), adapted_dyn_token.size(1))
+            if adapted_seq_token.size(1) != adapted_dyn_token.size(1):
+                raise ValueError(
+                    f"Sequence length mismatch between primary and dynamics encoders: "
+                    f"{adapted_seq_token.size(1)} vs {adapted_dyn_token.size(1)}"
+                )
+            seq_len = adapted_seq_token.size(1)
             adapted_seq_token = torch.cat(
                 [adapted_seq_token[:, :seq_len, :], adapted_dyn_token[:, :seq_len, :]], dim=-1
             )
