@@ -238,7 +238,9 @@ class GTDonorPredictor(nn.Module):
         dyn_repr_token = None
         if self.dynamics_encoder_enabled:
             if input_ids is None:
-                raise ValueError("dynamics_encoder requires input_ids")
+                raise ValueError(
+                    f"dynamics_encoder requires input_ids, but model_type '{self.model_type}' does not provide them"
+                )
             dyn_out = self.dynamics_encoder(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
             dyn_repr_cls = dyn_out.last_hidden_state[:, 0, :]
             dyn_repr_token = dyn_out.last_hidden_state
