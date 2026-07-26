@@ -354,6 +354,8 @@ class GTDonorPredictor(nn.Module):
         for k, v in full_state_dict.items():
             if k.startswith("seq_encoder.") and not self.train_seq_encoder:
                 continue
+            if k.startswith("dynamics_encoder."):
+                continue
             if k.startswith("unimol.") and not self.train_unimol:
                 continue
             filtered_state_dict[k] = v
