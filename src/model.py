@@ -258,6 +258,7 @@ class GTDonorPredictor(nn.Module):
         if self.dynamics_encoder_enabled:
             adapted_dyn_cls = self.dynamics_adapter(dyn_repr_cls)
             adapted_dyn_token = self.dynamics_adapter(dyn_repr_token)
+            # Keep token-wise fusion aligned if encoder tokenization lengths differ.
             seq_len = min(adapted_seq_token.size(1), adapted_dyn_token.size(1))
             adapted_seq_token = torch.cat(
                 [adapted_seq_token[:, :seq_len, :], adapted_dyn_token[:, :seq_len, :]], dim=-1
